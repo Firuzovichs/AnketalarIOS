@@ -1,0 +1,56 @@
+# Xcode
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+DerivedData/
+.build/
+
+# Xcode project user data
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+Package.resolved
+
+# CocoaPods (ishlatilmasa ham)
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/Build/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Build artifacts
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Environment / secrets
+.env
+*.p8
+*.p12
+*.mobileprovision
+GoogleService-Info.plist
+
+# Yandex MapKit xcframework (katta fayl — alohida yuklab olinadi)
+**/YandexMapsMobile*.xcframework/
+**/YandexMaps*.xcframework/
+
+# Zip arxivlar
+*.zip
