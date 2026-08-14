@@ -14,7 +14,7 @@ import Combine
 @MainActor
 class ChatRoomViewModel: ObservableObject {
     let room: ChatRoomModel
-    let myId: Int?
+    var myId: Int?
 
     @Published var messages: [ChatMessage] = []
     @Published var isLoading = false
@@ -82,6 +82,15 @@ class ChatRoomViewModel: ObservableObject {
     /// olish uchun).
     var isFetchingMessages = false
 
+    /// Optimistik pending xabarlar uchun mahalliy ID generatori.
+    /// Manfiy son bo'lib, server ID'laridan farqlanadi (server har doim musbat ID beradi).
+    private var _pendingIdCounter = -1
+    func nextPendingId() -> Int {
+        let id = _pendingIdCounter
+        _pendingIdCounter -= 1
+        return id
+    }
+
     init(room: ChatRoomModel, myId: Int?) {
         self.room = room
         self.myId = myId
@@ -94,6 +103,12 @@ class ChatRoomViewModel: ObservableObject {
     func start() async {
         await fetchMessages()
         connectWebSocket()
+        // WS to'liq ulangach tarixiy xabarlarni "o'qildi" deb belgilaymiz.
+        // sendReadReceiptsAfterConnect WebSocket extension'da — ping orqali
+        // ulanishni tasdiqlab keyin read yuboradi.
+        Task {
+            await sendReadReceiptsAfterConnect(for: messages)
+        }
     }
 
     func stop() {

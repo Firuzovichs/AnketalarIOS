@@ -75,9 +75,9 @@ enum LKey: String {
     // Chat tab
     case chatTitle, chatEmptyTitle, chatEmptySub
     case chatSupportName, chatSupportSub, chatNoMessages
-    case chatYouPrefix, chatMsgPhoto, chatMsgVideo, chatMsgVoice, chatMsgDeleted, chatMsgLocation
+    case chatYouPrefix, chatMsgPhoto, chatMsgVideo, chatMsgVideoNote, chatMsgVoice, chatMsgDeleted, chatMsgLocation
     case chatMsgStoryReply
-    case chatYesterday, chatExpiresToday, chatExpiresInDays
+    case chatToday, chatYesterday, chatExpiresToday, chatExpiresInDays
     case chatLockedRowLabel, chatLockedAlertTitle, chatLockedAlertBody, chatLockedDetail
     case chatTyping, chatReply, chatInputPlaceholder
     case chatAttachPhoto, chatAttachVideo, chatAttachLocation

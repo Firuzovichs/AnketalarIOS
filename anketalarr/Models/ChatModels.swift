@@ -28,6 +28,22 @@ func formattedChatTime(_ raw: String?) -> String {
     return f.string(from: d)
 }
 
+/// Telegram uslubidagi suzuvchi sana tasmasi uchun yorliq:
+/// bugun → "Bugun", kecha → "Kecha", boshqa → "d MMMM" yoki "d MMMM yyyy"
+func chatDateHeader(_ raw: String?) -> String {
+    guard let d = parseChatDate(raw) else { return "" }
+    let cal = Calendar.current
+    if cal.isDateInToday(d)     { return LocalizationManager.get(.chatToday)     }
+    if cal.isDateInYesterday(d) { return LocalizationManager.get(.chatYesterday) }
+    let f = DateFormatter()
+    let thisYear = cal.component(.year, from: Date())
+    let msgYear  = cal.component(.year, from: d)
+    f.dateFormat = (msgYear == thisYear) ? "d MMMM" : "d MMMM yyyy"
+    let langCode = UserDefaults.standard.string(forKey: "app_language") ?? "uz"
+    f.locale     = Locale(identifier: langCode == "ru" ? "ru" : "uz")
+    return f.string(from: d)
+}
+
 // MARK: - Reply preview (xabar ichidagi "javob berilgan xabar")
 
 struct ChatReplyPreview: Identifiable, Decodable {
@@ -38,12 +54,18 @@ struct ChatReplyPreview: Identifiable, Decodable {
     let media: String?
     let created_at: String?
 
-    var mediaURL: URL? { media.flatMap { URL(string: $0) } }
+    var mediaURL: URL? {
+        guard let media else { return nil }
+        if media.hasPrefix("http://") || media.hasPrefix("https://") { return URL(string: media) }
+        let host = APIConfig.base.components(separatedBy: "/api").first ?? ""
+        return URL(string: host + media)
+    }
 
     var previewText: String {
         switch message_type {
         case "image": return LocalizationManager.get(.chatMsgPhoto)
         case "video": return LocalizationManager.get(.chatMsgVideo)
+        case "video_note": return LocalizationManager.get(.chatMsgVideoNote)
         case "voice": return LocalizationManager.get(.chatMsgVoice)
         case "location": return LocalizationManager.get(.chatMsgLocation)
         case "disappearing_photo": return LocalizationManager.get(.chatMsgDisappearingPhoto)
@@ -65,7 +87,12 @@ struct ChatStoryRef: Decodable {
     let media_type: String?
     let caption: String?
 
-    var mediaURL: URL? { media.flatMap { URL(string: $0) } }
+    var mediaURL: URL? {
+        guard let media else { return nil }
+        if media.hasPrefix("http://") || media.hasPrefix("https://") { return URL(string: media) }
+        let host = APIConfig.base.components(separatedBy: "/api").first ?? ""
+        return URL(string: host + media)
+    }
 }
 
 // MARK: - Xabar
@@ -106,6 +133,17 @@ struct ChatMessage: Identifiable, Decodable, Equatable {
     let viewed_at: String?
     let disappear_expired: Bool?
 
+    /// JSON'dan yuklanmaydi — faqat mahalliy "yuborilmoqda" placeholder uchun.
+    var isPending: Bool = false
+
+    /// JSON maydonlari — `isPending` Decodable'dan chiqarib tashlangan,
+    /// shuning uchun serverdan kelgan xabarlarda har doim `false` bo'ladi.
+    private enum CodingKeys: String, CodingKey {
+        case id, room, sender, message_type, content, media, story, duration
+        case latitude, longitude, reply_to, is_read, seen_by_other, is_deleted
+        case is_edited, created_at, disappear_seconds, viewed_at, disappear_expired
+    }
+
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
         lhs.id == rhs.id && lhs.is_read == rhs.is_read &&
         lhs.seen_by_other == rhs.seen_by_other && lhs.is_deleted == rhs.is_deleted &&
@@ -115,11 +153,36 @@ struct ChatMessage: Identifiable, Decodable, Equatable {
     /// "Tahrirlangan" yorlig'i ko'rsatilishi kerakmi.
     var isEdited: Bool { is_edited == true }
 
-    var mediaURL: URL? { media.flatMap { URL(string: $0) } }
-
+    /// Pending xabarlar — `isMine` har doim `true` (sender null bo'lsa ham).
     func isMine(_ myId: Int?) -> Bool {
+        if isPending { return true }
         guard let myId else { return false }
         return sender?.id == myId
+    }
+
+    /// Optimistik "yuborilmoqda" xabar — serverga javob kutmasdan darhol
+    /// chatda ko'rsatish uchun. Upload tugagach real server xabari bilan almashtiriladi.
+    static func pending(id: Int, type: String, content: String? = nil, duration: Double? = nil) -> ChatMessage {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var msg = ChatMessage(
+            id: id, room: nil, sender: nil,
+            message_type: type, content: content, media: nil,
+            story: nil, duration: duration,
+            latitude: nil, longitude: nil, reply_to: nil,
+            is_read: nil, seen_by_other: nil, is_deleted: nil,
+            is_edited: nil, created_at: iso.string(from: Date()),
+            disappear_seconds: nil, viewed_at: nil, disappear_expired: nil
+        )
+        msg.isPending = true
+        return msg
+    }
+
+    var mediaURL: URL? {
+        guard let media else { return nil }
+        if media.hasPrefix("http://") || media.hasPrefix("https://") { return URL(string: media) }
+        let host = APIConfig.base.components(separatedBy: "/api").first ?? ""
+        return URL(string: host + media)
     }
 
     var formattedTime: String {
@@ -138,6 +201,7 @@ struct ChatMessage: Identifiable, Decodable, Equatable {
         switch message_type {
         case "image": return prefix + LocalizationManager.get(.chatMsgPhoto)
         case "video": return prefix + LocalizationManager.get(.chatMsgVideo)
+        case "video_note": return prefix + LocalizationManager.get(.chatMsgVideoNote)
         case "voice": return prefix + LocalizationManager.get(.chatMsgVoice)
         case "location": return prefix + LocalizationManager.get(.chatMsgLocation)
         case "disappearing_photo": return prefix + LocalizationManager.get(.chatMsgDisappearingPhoto)

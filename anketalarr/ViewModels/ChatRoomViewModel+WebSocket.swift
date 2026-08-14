@@ -61,6 +61,8 @@ extension ChatRoomViewModel {
             guard let self, !Task.isCancelled else { return }
             self.connectWebSocket()
             await self.fetchMessages()
+            // Qayta ulanishda o'qilmagan xabarlarni qayta belgilash
+            Task { await self.sendReadReceiptsAfterConnect(for: self.messages) }
         }
     }
 
@@ -70,46 +72,78 @@ extension ChatRoomViewModel {
         webSocketTask?.send(.string(text)) { _ in }
     }
 
+    /// `fetchMessages()` kabi boshqa fayllardan chaqirilishi uchun — tarixdagi
+    /// o'qilmagan xabarlarni WS orqali "o'qildi" deb belgilaydi.
+    /// Natijada unread_count sifirga tushadi va jo'natuvchida ✓✓ paydo bo'ladi.
+    func sendReadReceipts(for msgs: [ChatMessage]) {
+        guard !isLocked, let me = myId else { return }
+        msgs.filter { $0.is_read != true && $0.sender?.id != me && $0.id > 0 }
+            .forEach { sendWS(["action": "read", "message_id": $0.id]) }
+    }
+
+    /// WS ulanishi tayyor bo'lganda (ping orqali tasdiqlab) read receipt yuboradi.
+    /// URLSessionWebSocketTask.send() WS ochilmagan bo'lsa jim o'tib ketadi,
+    /// shuning uchun ping bilan ulanish holatini tekshirish zarur.
+    func sendReadReceiptsAfterConnect(for msgs: [ChatMessage]) async {
+        // myId nil bo'lsa (ChatListViewModel hali yuklamagan bo'lsa) — o'zimiz olamiz.
+        // Bu sendReadReceipts ichidagi `guard let me = myId else { return }` ni
+        // ishonchli qiladi — read receipt hech qachon o'tkazib yuborilmaydi.
+        if myId == nil {
+            let req = makeRequest(path: "/auth/me/", method: "GET")
+            let (data, _) = await APIClient.shared.send(req)
+            if let data, let me = try? JSONDecoder().decode(DashMe.self, from: data) {
+                myId = me.id
+            }
+        }
+
+        for _ in 1...10 {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            guard let task = webSocketTask, task.state == .running else { continue }
+            var pingOK = false
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                task.sendPing { error in
+                    pingOK = (error == nil)
+                    cont.resume()
+                }
+            }
+            if pingOK {
+                sendReadReceipts(for: msgs)
+                return
+            }
+        }
+        // 5 soniya ichida ulanmasa — baribir yuboramiz
+        sendReadReceipts(for: msgs)
+    }
+
     private func handleFrame(_ frame: URLSessionWebSocketTask.Message) {
         guard case .string(let text) = frame,
               let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let event = json["event"] as? String else { return }
+              let type = json["type"] as? String else { return }
 
-        switch event {
-        case "new_message":
-            // O'ZIMIZ yuborgan xabar uchun (sendText/sendImage/sendVoice) bu
-            // xabar ALLAQACHON performSend ichida mahalliy (optimistic) qo'shib
-            // qo'yilgan — shu sababli bu yerda yana ishlov berish SHART EMAS.
-            // Faqat BOSHQA foydalanuvchidan kelgan xabar uchun ishlov beramiz
-            // — WS payload'da uning to'liq sender obyekti yo'q, shu sababli
-            // shu BITTA xabarni `MessageDetailView` orqali alohida olib
-            // kelamiz. MUHIM: avval bu yerda BUTUN tarix (`fetchMessages()`)
-            // qayta yuklanardi — suhbat uzayishi bilan har bir yangi xabar
-            // tobora SEKINLASHIB borardi (har safar minglab eski xabarni
-            // qayta yuklash kerak bo'lardi). Endi har bir yangi xabar
-            // suhbat uzunligidan qat'i nazar BIR XIL tezlikda keladi.
-            guard let senderId = json["sender_id"] as? Int, senderId != myId,
-                  let messageId = json["id"] as? Int else { return }
-            Task {
-                guard let msg = await self.fetchSingleMessage(messageId) else { return }
-                // Poyga holatidan saqlanish (masalan WS ikki marta yetib
-                // kelsa) — id bo'yicha allaqachon bor bo'lsa qayta qo'shmaymiz.
-                if !self.messages.contains(where: { $0.id == msg.id }) {
-                    self.messages.append(msg)
-                }
-                // Suhbat OCHIQ turgan paytda kelgan xabarni darhol "o'qildi"
-                // deb belgilaymiz — avval buni `fetchMessages()`ning ichidagi
-                // (list endpoint) yon ta'siri bajarardi, endi har bir xabar
-                // uchun BUTUN ro'yxatni qayta yuklamasdan, mavjud WS `read`
-                // amali orqali (consumer: `handle_read`) faqat shu BITTA
-                // xabar belgilanadi va suhbatdoshga "ko'rildi" (✓✓) hodisasi
-                // jonli yuboriladi.
-                self.sendWS(["action": "read", "message_id": msg.id])
-                // Suhbatdosh yozdi — shu xonani ham ro'yxat boshiga ko'chirish
-                // uchun xabar beramiz (men yozganimdagi kabi).
-                self.onMessageActivity?(msg)
+        switch type {
+        case "chat_message":
+            // Backend signals.py to'liq MessageSerializer ma'lumotini
+            // json["message"] ichida yuboradi — sender, reply_to, media bilan.
+            // Shu sababli endi alohida HTTP so'rov (fetchSingleMessage) kerak
+            // emas: to'g'ridan-to'g'ri ChatMessage sifatida decode qilamiz.
+            // O'ZIMIZ yuborgan xabar optimistic UI orqali allaqachon qo'shilgan —
+            // faqat BOSHQA foydalanuvchidan kelgan xabarni qo'shamiz.
+            guard let msgDict = json["message"],
+                  let msgData = try? JSONSerialization.data(withJSONObject: msgDict),
+                  let msg = try? JSONDecoder().decode(ChatMessage.self, from: msgData),
+                  let senderId = msg.sender?.id, senderId != myId else { return }
+            // Poyga holatidan saqlanish — id bo'yicha allaqachon bor bo'lsa
+            // qayta qo'shmaymiz.
+            if !messages.contains(where: { $0.id == msg.id }) {
+                messages.append(msg)
             }
+            // Suhbat OCHIQ turgan paytda kelgan xabarni darhol "o'qildi"
+            // deb belgilaymiz — WS `read` amali orqali.
+            sendWS(["action": "read", "message_id": msg.id])
+            // Suhbatdosh xabar yozdi — ro'yxatni boshiga ko'tirish uchun.
+            onMessageActivity?(msg)
+
         case "typing":
             if let uid = json["user_id"] as? Int, uid != myId {
                 let flag = json["is_typing"] as? Bool ?? false
@@ -123,6 +157,7 @@ extension ChatRoomViewModel {
                     }
                 }
             }
+
         case "message_read":
             if let messageId = json["message_id"] as? Int,
                let idx = messages.firstIndex(where: { $0.id == messageId }) {
@@ -137,24 +172,14 @@ extension ChatRoomViewModel {
                     disappear_seconds: old.disappear_seconds, viewed_at: old.viewed_at, disappear_expired: old.disappear_expired
                 )
             }
+
         case "presence":
             if let uid = json["user_id"] as? Int, uid != myId {
                 otherOnline = json["is_online"] as? Bool ?? otherOnline
             }
+
         default:
             break
         }
-    }
-
-    /// WS orqali kelgan "new_message" hodisasi uchun — BUTUN tarixni qayta
-    /// yuklamasdan, faqat shu BITTA xabarning to'liq ma'lumotini (sender,
-    /// media, reply_to va h.k. — WS broadcast yengil payload yuboradi)
-    /// serverdan olib keladi. Tezlik uchun: `GET /chat/messages/<id>/`.
-    private func fetchSingleMessage(_ id: Int) async -> ChatMessage? {
-        let req = makeRequest(path: "/chat/messages/\(id)/", method: "GET")
-        let (data, status) = await APIClient.shared.send(req)
-        guard status == 200, let data,
-              let msg = try? JSONDecoder().decode(ChatMessage.self, from: data) else { return nil }
-        return msg
     }
 }

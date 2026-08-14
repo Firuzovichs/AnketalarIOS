@@ -48,6 +48,8 @@ struct ChatMediaViewerView: View {
     private func mediaPage(_ msg: ChatMessage) -> some View {
         if msg.message_type == "video", let url = msg.mediaURL {
             VideoPagerPage(url: url)
+        } else if msg.message_type == "video_note", let url = msg.mediaURL {
+            VideoNotePagerPage(url: url)
         } else if let url = msg.mediaURL {
             ZoomableImagePage(url: url)
         } else {
@@ -149,6 +151,37 @@ private struct VideoPagerPage: View {
                 VideoPlayer(player: player)
             } else {
                 ProgressView().tint(.white)
+            }
+        }
+        .onAppear {
+            let p = AVPlayer(url: url)
+            player = p
+            p.play()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+    }
+}
+
+/// Doira video xabar uchun to'liq ekran player — circle clip bilan.
+private struct VideoNotePagerPage: View {
+    let url: URL
+    @State private var player: AVPlayer? = nil
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            Group {
+                if let player {
+                    VideoPlayer(player: player)
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipShape(Circle())
+                        .frame(maxWidth: 320, maxHeight: 320)
+                } else {
+                    ProgressView().tint(.white)
+                }
             }
         }
         .onAppear {

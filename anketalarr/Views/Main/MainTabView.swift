@@ -7,7 +7,7 @@ private struct TabItem {
 }
 
 private let tabItems: [TabItem] = [
-    .init(icon: "house",           activeIcon: "house.fill",             label: "Bosh"),
+    .init(icon: "house",           activeIcon: "house.fill",              label: "Bosh"),
     .init(icon: "magnifyingglass", activeIcon: "sparkle.magnifyingglass", label: "Qidirish"),
     .init(icon: "heart",           activeIcon: "heart.fill",              label: "Like"),
     .init(icon: "message",         activeIcon: "message.fill",            label: "Chat"),
@@ -18,72 +18,66 @@ struct MainTabView: View {
     @EnvironmentObject var theme: AppTheme
     @EnvironmentObject var lang:  LocalizationManager
     @State private var selectedTab = 0
-    // Chat tab-bar badge butun ilova davomida bitta manbadan kelishi uchun
-    // ViewModel shu yerda (egasi) yaratiladi va ChatListView ga beriladi.
-    @StateObject private var chatVM = ChatListViewModel()
-    // Ilova bo'ylab BARCHA "Premium kerak" joylari shu umumiy darvoza orqali
-    // bitta Obuna sahifasiga (SubscriptionView) yo'naltiriladi — qarang
-    // Managers/PaywallGate.swift. Autentifikatsiyadan o'tgan butun daraxtga
-    // .environmentObject orqali uzatiladi.
+    @State private var prevTab     = 0
+    @StateObject private var chatVM    = ChatListViewModel()
     @StateObject private var paywallGate = PaywallGate()
 
-    private let tabBarH: CGFloat = 56
-    private let bottomPad: CGFloat = 28   // home indicator clearance
+    private let tabBarH:   CGFloat = 64    // ozroq kattaroq
+    private let bottomPad: CGFloat = 28
 
     var body: some View {
-        // GeometryReader gives us the exact available width/height
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let barH = tabBarH + bottomPad
 
             ZStack(alignment: .bottom) {
-                // ── Tab content ────────────────────────────────────────
-                Group {
-                    switch selectedTab {
-                    case 1:  MapTabView()
-                    case 2:  LikeTabView()
-                    case 3:  ChatListView(vm: chatVM)
-                    case 4:  ProfileView()
-                    default: DashboardView()
+
+                // ── Tab content (fade animatsiya) ──────────────────────
+                ZStack {
+                    tabContent(0).opacity(selectedTab == 0 ? 1 : 0)
+                    tabContent(1).opacity(selectedTab == 1 ? 1 : 0)
+                    tabContent(2).opacity(selectedTab == 2 ? 1 : 0)
+                    tabContent(3).opacity(selectedTab == 3 ? 1 : 0)
+                    tabContent(4).opacity(selectedTab == 4 ? 1 : 0)
+                }
+                .animation(.easeInOut(duration: 0.22), value: selectedTab)
+                .frame(width: w, height: h)
+
+                // ── Tab bar (floating glass pill) ──────────────────────
+                HStack(spacing: 0) {
+                    ForEach(tabItems.indices, id: \.self) { i in
+                        tabButton(tabItems[i], index: i, width: (w - 32) / CGFloat(tabItems.count))
                     }
                 }
-                .frame(width: w, height: h)  // exact size, no ambiguity
-
-                // ── Tab bar ────────────────────────────────────────────
-                VStack(spacing: 0) {
-                    // Top shadow line
-                    Rectangle()
-                        .fill(Color.black.opacity(0.06))
-                        .frame(height: 0.5)
-
-                    HStack(spacing: 0) {
-                        ForEach(tabItems.indices, id: \.self) { i in
-                            tabButton(tabItems[i], index: i, width: w / CGFloat(tabItems.count))
-                        }
-                    }
-                    .frame(width: w, height: tabBarH)
-
-                    // Home indicator spacer
-                    Color(.systemBackground)
-                        .frame(width: w, height: bottomPad)
-                }
-                .frame(width: w)
-                .background(Color(.systemBackground))
+                .frame(height: tabBarH)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+                .shadow(color: .black.opacity(0.22), radius: 20, x: 0, y: 6)
+                .padding(.horizontal, 16)
+                .padding(.bottom, max(bottomPad, 16))
             }
             .frame(width: w, height: h)
-            .ignoresSafeArea(edges: .bottom)
         }
-        .ignoresSafeArea(edges: .bottom)
         .environmentObject(paywallGate)
         .fullScreenCover(isPresented: $paywallGate.isPresented) {
             SubscriptionView()
         }
         .task {
-            // Tab-bar badge'i qaysi tab ochiq bo'lishidan qat'i nazar to'g'ri
-            // ko'rsatilishi uchun suhbatlar ro'yxati ilova ochilganda darrov yuklanadi.
             await chatVM.loadInitial()
             chatVM.startPolling()
+        }
+    }
+
+    // MARK: - Tab content
+
+    @ViewBuilder
+    private func tabContent(_ index: Int) -> some View {
+        switch index {
+        case 1:  MapTabView()
+        case 2:  LikeTabView()
+        case 3:  ChatListView(vm: chatVM)
+        case 4:  ProfileView()
+        default: DashboardView()
         }
     }
 
@@ -91,42 +85,53 @@ struct MainTabView: View {
 
     private func tabButton(_ item: TabItem, index: Int, width: CGFloat) -> some View {
         let active = selectedTab == index
-        let badge = index == 3 ? chatVM.totalUnread : 0
+        let badge  = index == 3 ? chatVM.totalUnread : 0
+        let color  = active ? theme.primary : Color(.secondaryLabel)
+
         return Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+            withAnimation(.easeInOut(duration: 0.18)) {
                 selectedTab = index
             }
         } label: {
-            ZStack(alignment: .topTrailing) {
+            ZStack {
+                // ── Doira fon — faol tab uchun ──
                 if active {
-                    Image(systemName: item.activeIcon)
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 48, height: 36)
-                        .background(Capsule().fill(theme.buttonGradient))
-                } else {
-                    Image(systemName: item.icon)
-                        .font(.system(size: 21, weight: .regular))
-                        .foregroundColor(theme.textSecondary)
-                        .frame(width: 48, height: 36)
+                    Capsule()
+                        .fill(Color(.label).opacity(0.1))
+                        .frame(width: 74, height: 52)
                 }
 
-                if badge > 0 {
-                    Text(badge > 99 ? "99+" : "\(badge)")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1.5)
-                        .background(Color.red)
-                        .clipShape(Capsule())
-                        .offset(x: 6, y: -2)
+                // ── Icon + label ─────────────────────
+                VStack(spacing: 3) {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: active ? item.activeIcon : item.icon)
+                            .font(.system(size: 24, weight: active ? .semibold : .regular))
+                            .foregroundColor(color)
+                            .scaleEffect(active ? 1.08 : 1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: active)
+                            .frame(width: 30, height: 26)
+
+                        if badge > 0 {
+                            Text(badge > 99 ? "99+" : "\(badge)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1.5)
+                                .background(Color.red)
+                                .clipShape(Capsule())
+                                .offset(x: 12, y: -4)
+                        }
+                    }
+
+                    Text(item.label)
+                        .font(.system(size: 11, weight: active ? .semibold : .regular))
+                        .foregroundColor(color)
                 }
             }
-            .frame(width: width, height: tabBarH)  // exact width per tab
+            .frame(width: width, height: tabBarH)
         }
         .buttonStyle(.plain)
     }
-
 }
 
 #Preview {

@@ -166,7 +166,21 @@ struct YandexMapView: UIViewRepresentable {
                 usersById[user.id] = user
 
                 if let existing = placemarks[user.id] {
-                    existing.geometry = YMKPoint(latitude: coord.latitude, longitude: coord.longitude)
+                    // isValid — native ob'ekt hali tirikmi?
+                    if existing.isValid {
+                        existing.geometry = YMKPoint(latitude: coord.latitude, longitude: coord.longitude)
+                    } else {
+                        // Native ob'ekt eskirgan — eski yozuvni o'chirib qayta yaratamiz
+                        placemarks.removeValue(forKey: user.id)
+                        renderedBlurState.removeValue(forKey: user.id)
+                        let placemark = mapObjects.addPlacemark()
+                        placemark.geometry = YMKPoint(latitude: coord.latitude, longitude: coord.longitude)
+                        placemark.userData = user.id
+                        placemark.setIconWith(MapPinRenderer.placeholder(isOnline: user.is_online == true))
+                        placemark.setTextWithText(user.mapLabel, style: Coordinator.nameTextStyle)
+                        placemark.addTapListener(with: self)
+                        placemarks[user.id] = placemark
+                    }
                 } else {
                     let placemark = mapObjects.addPlacemark()
                     placemark.geometry = YMKPoint(latitude: coord.latitude, longitude: coord.longitude)
@@ -182,7 +196,9 @@ struct YandexMapView: UIViewRepresentable {
 
             // Endi ko'rinmaydigan (filtr/radius tashqarisidagi) odamlarning pin'larini olib tashlash
             for (id, placemark) in placemarks where !newIds.contains(id) {
-                mapObjects.remove(with: placemark)
+                if placemark.isValid {
+                    mapObjects.remove(with: placemark)
+                }
                 placemarks.removeValue(forKey: id)
                 renderedBlurState.removeValue(forKey: id)
             }
@@ -201,7 +217,9 @@ struct YandexMapView: UIViewRepresentable {
                     isOnline: user.is_online == true, isVip: user.isPremium
                 )
                 DispatchQueue.main.async {
-                    self.placemarks[user.id]?.setIconWith(pin)
+                    // isValid tekshirish — async callback kelguncha placemark o'chirilgan bo'lishi mumkin
+                    guard let placemark = self.placemarks[user.id], placemark.isValid else { return }
+                    placemark.setIconWith(pin)
                 }
             }.resume()
         }

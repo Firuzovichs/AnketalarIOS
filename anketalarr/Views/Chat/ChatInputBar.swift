@@ -270,7 +270,7 @@ struct ChatInputBar: View {
         case .video:
             Task {
                 if let data = await videoRecorder.stopAndFinish() {
-                    await vm.sendVideo(data)
+                    await vm.sendVideoNote(data)
                 }
             }
         }

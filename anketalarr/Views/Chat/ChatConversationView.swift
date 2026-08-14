@@ -84,6 +84,9 @@ struct ChatConversationView: View {
     /// `messagesList`dagi `ScrollViewReader`ning proxy'si — qidiruv natijasi
     /// bosilganda shu xabarga sakrash uchun shu yerda saqlanadi.
     @State private var scrollProxy: ScrollViewProxy? = nil
+    /// Hozir ekranda ko'rinib turgan xabarlar ID to'plami — suzuvchi sana
+    /// tasmasi qaysi kunni ko'rsatishini aniqlash uchun ishlatiladi.
+    @State private var visibleMsgIds: Set<Int> = []
     /// `true` bo'lganda `vm.messages.count`ning o'zgarishi ESKIROQ xabarlar
     /// ro'yxat BOSHIGA qo'shilgani sababli (`loadOlderIfNeeded()`) — bu holda
     /// pastga avtomatik scroll qilinmasligi kerak (faqat YANGI xabar kelganda/
@@ -110,6 +113,8 @@ struct ChatConversationView: View {
     /// Galereyadan tanlangan, hali yuborilmagan rasm — tasdiqlash ekranini
     /// (`ImageSendPreviewView`) ko'rsatish uchun. nil bo'lmasa shu ekran ochiq.
     @State private var pendingPhoto: PendingPhoto? = nil
+    /// Telegram uslubidagi video_note overlay URL — nil bo'lmasa overlay ko'rinadi.
+    @State private var videoNoteOverlayURL: URL? = nil
 
     init(room: ChatRoomModel, myId: Int?, onDismiss: @escaping () -> Void,
          onMessageActivity: ((ChatMessage) -> Void)? = nil) {
@@ -123,6 +128,13 @@ struct ChatConversationView: View {
     var body: some View {
         ZStack {
             theme.background.ignoresSafeArea()
+
+            // ── Video note Telegram-style overlay ───────────────────────
+            if let vnUrl = videoNoteOverlayURL {
+                VideoNoteOverlay(url: vnUrl) { videoNoteOverlayURL = nil }
+                    .transition(.opacity.combined(with: .scale(scale: 0.88, anchor: .center)))
+                    .zIndex(10)
+            }
 
             VStack(spacing: 0) {
                 ChatHeaderBar(
@@ -426,7 +438,7 @@ struct ChatConversationView: View {
     /// media URL'i mavjud bo'lganlari (shu tartibda, suhbatdagi tartibga mos).
     private var mediaMessages: [ChatMessage] {
         vm.messages.filter { msg in
-            (msg.message_type == "image" || msg.message_type == "video")
+            (msg.message_type == "image" || msg.message_type == "video" || msg.message_type == "video_note")
                 && msg.is_deleted != true && msg.mediaURL != nil
         }
     }
@@ -487,6 +499,20 @@ struct ChatConversationView: View {
         }
     }
 
+    // MARK: - Suzuvchi sana tasmasi
+
+    /// Ekranda ko'rinib turgan xabarlarning eng eskisiga mos sana yorlig'i.
+    /// "Bugun" / "Kecha" / "d MMMM" formatida — `chatDateHeader()` orqali.
+    private var topVisibleDateLabel: String {
+        guard !visibleMsgIds.isEmpty else { return "" }
+        let visible = vm.messages.filter { visibleMsgIds.contains($0.id) }
+        guard let oldest = visible.min(by: {
+            (parseChatDate($0.created_at) ?? .distantFuture) <
+            (parseChatDate($1.created_at) ?? .distantFuture)
+        }) else { return "" }
+        return chatDateHeader(oldest.created_at)
+    }
+
     // MARK: - Messages
 
     private var messagesList: some View {
@@ -510,12 +536,19 @@ struct ChatConversationView: View {
                                 onDelete: { Task { await vm.deleteMessage(msg.id) } },
                                 onEdit: { startEditing(msg) },
                                 onTapMedia: { openMediaViewer(for: msg) },
+                                onTapVideoNote: { url in
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                                        videoNoteOverlayURL = url
+                                    }
+                                },
                                 isExpiredLocally: vm.locallyExpiredPhotoIds.contains(msg.id),
                                 onTapDisappearing: { openDisappearingPhoto(msg) },
                                 isHighlighted: msg.id == highlightedMessageId
                             )
                             .id(msg.id)
                             .onAppear {
+                                // Suzuvchi sana tasmasi uchun ko'rinish to'plamini yangilaydi.
+                                visibleMsgIds.insert(msg.id)
                                 // Ro'yxatdagi ENG BIRINCHI (eng eski) xabar ko'rinib
                                 // qolganda — navbatdagi eskirog' sahifasini so'raymiz
                                 // (Telegram uslubidagi cheksiz yuqoriga scroll).
@@ -523,6 +556,7 @@ struct ChatConversationView: View {
                                     Task { await loadOlderIfNeeded(proxy: proxy) }
                                 }
                             }
+                            .onDisappear { visibleMsgIds.remove(msg.id) }
                         }
                         // Ro'yxat tubidagi ko'rinmas langar — "pastga tushish"
                         // tugmasini ko'rsatish/yashirish shu orqali aniqlanadi.
@@ -557,6 +591,23 @@ struct ChatConversationView: View {
 
                 if !isAtBottom && !vm.messages.isEmpty {
                     scrollToBottomButton(proxy: proxy)
+                }
+            }
+            .overlay(alignment: .top) {
+                // Suzuvchi sana tasmasi — foydalanuvchi qaysi kungi xabarlarni
+                // o'qiyotganini telegram uslubida tepada ko'rsatadi.
+                let label = topVisibleDateLabel
+                if !label.isEmpty {
+                    Text(label)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Color.black.opacity(0.45))
+                        .clipShape(Capsule())
+                        .padding(.top, 8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .animation(.easeInOut(duration: 0.2), value: label)
                 }
             }
         }
@@ -608,17 +659,20 @@ struct ChatConversationView: View {
     private var typingBar: some View {
         if vm.otherTyping {
             HStack {
-                Text(lang[.chatTyping])
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.primary)
+                TypingDotsView(color: theme.textSecondary, bg: theme.cardBackground)
                 Spacer()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 2)
+            .padding(.leading, 12)
+            .padding(.bottom, 4)
+            .transition(.asymmetric(
+                insertion: .move(edge: .bottom).combined(with: .opacity),
+                removal: .opacity
+            ))
         }
     }
 
     // MARK: - Reply bar (yuborishdan oldin)
+
 
     @ViewBuilder
     private var replyBar: some View {
@@ -664,4 +718,75 @@ struct ChatConversationView: View {
 
 }
 
+// ── Typing dots bubble (Telegram/WhatsApp uslubida) ──────────────────────────
+private struct TypingDotsView: View {
+    let color: Color
+    let bg:    Color
+
+    @State private var phase = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(color.opacity(0.75))
+                    .frame(width: 7, height: 7)
+                    .offset(y: phase ? -5 : 0)
+                    .animation(
+                        .easeInOut(duration: 0.42)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(i) * 0.14),
+                        value: phase
+                    )
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(bg)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
+        .onAppear { phase = true }
+        .onDisappear { phase = false }
+    }
+}
+
+// ── Video note Telegram-style overlay ─────────────────────────────────────────
+/// Bosiganda to'liq ekranga kirmay, suhbat ustida kichik doira video o'ynaydi.
+private struct VideoNoteOverlay: View {
+    let url: URL
+    let onDismiss: () -> Void
+
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.82)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3)) { onDismiss() }
+                }
+
+            if let player {
+                VideoPlayer(player: player)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(Circle())
+                    .frame(width: 280, height: 280)
+                    .allowsHitTesting(false)
+            } else {
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(1.3)
+            }
+        }
+        .onAppear {
+            let p = AVPlayer(url: url)
+            player = p
+            p.play()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+    }
+}
 
