@@ -35,6 +35,8 @@ let uzT: [LKey: String] = [
 
     .resetTitle:   "Parolni tiklash",
     .resetSub:     "Email yoki telefon raqamingizni kiriting",
+    .otpTimeLeft:  "Kod amal qilish vaqti",
+    .errOtpExpired: "Kodning amal qilish vaqti tugadi. Yangi kod yuboring.",
     .newPwdTitle:  "Yangi parol",
     .newPwdSub:    "Xavfsiz yangi parol kiriting",
     .newPwdPH:     "Yangi parol*",

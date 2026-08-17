@@ -35,6 +35,8 @@ let enT: [LKey: String] = [
 
     .resetTitle:   "Reset Password",
     .resetSub:     "Enter your email or phone number",
+    .otpTimeLeft:  "Code expires in",
+    .errOtpExpired: "The code has expired. Please request a new code.",
     .newPwdTitle:  "New Password",
     .newPwdSub:    "Enter a new secure password",
     .newPwdPH:     "New password*",

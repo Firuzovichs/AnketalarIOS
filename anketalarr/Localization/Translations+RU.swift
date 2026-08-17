@@ -35,6 +35,8 @@ let ruT: [LKey: String] = [
 
     .resetTitle:   "Сброс пароля",
     .resetSub:     "Введите ваш email или номер телефона",
+    .otpTimeLeft:  "Код действителен",
+    .errOtpExpired: "Срок действия кода истёк. Отправьте новый код.",
     .newPwdTitle:  "Новый пароль",
     .newPwdSub:    "Введите новый надёжный пароль",
     .newPwdPH:     "Новый пароль*",

@@ -9,12 +9,57 @@ import SwiftUI
 // orqali aniqlanadi), Like tugmasi o'rniga Bloklash + Chatga o'tish tugmalari
 // ko'rsatiladi.
 
+private struct UserProfileSocialLink {
+    let platform: String
+    let label: String
+    let icon: String
+    let brandColor: Color
+    let url: URL
+    let value: String
+}
+
+private func userProfileSocialLinks(from profile: DashProfile?) -> [UserProfileSocialLink] {
+    guard let profile else { return [] }
+    func clean(_ raw: String?) -> String? {
+        let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? nil : value
+    }
+    func normalized(platform: String, usernameOrUrl: String) -> String {
+        let lower = usernameOrUrl.lowercased()
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") { return usernameOrUrl }
+        let withoutSpaces = usernameOrUrl.replacingOccurrences(of: " ", with: "")
+        let handle = withoutSpaces.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        switch platform {
+        case "tiktok": return "https://www.tiktok.com/@\(handle)"
+        case "instagram": return "https://www.instagram.com/\(handle)"
+        case "telegram": return "https://t.me/\(handle)"
+        default: return withoutSpaces
+        }
+    }
+
+    let items: [(String, String, String, Color, String?)] = [
+        ("tiktok", "TikTok", "music.note", Color(red: 0.07, green: 0.07, blue: 0.08), clean(profile.social_tiktok)),
+        ("instagram", "Instagram", "camera.fill", Color(red: 0.89, green: 0.16, blue: 0.36), clean(profile.social_instagram)),
+        ("telegram", "Telegram", "paperplane.fill", Color(red: 0.13, green: 0.62, blue: 0.85), clean(profile.social_telegram)),
+    ]
+
+    return items.compactMap { item in
+        guard
+            let raw = item.4,
+            let url = URL(string: normalized(platform: item.0, usernameOrUrl: raw))
+        else { return nil }
+        let handle = String((raw.split(separator: "/").last.map(String.init) ?? raw).drop(while: { $0 == "@" }))
+        return UserProfileSocialLink(platform: item.0, label: item.1, icon: item.2, brandColor: item.3, url: url, value: handle)
+    }
+}
+
 struct UserProfileView: View {
     let user: DashUser
     var onDismiss: (() -> Void)? = nil
 
     @EnvironmentObject var theme: AppTheme
     @EnvironmentObject var lang: LocalizationManager
+    @Environment(\.openURL) private var openURL
     @StateObject private var vm = UserProfileViewModel()
 
     @State private var currentPhotoIndex: Int = 0
@@ -25,27 +70,40 @@ struct UserProfileView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                theme.background.ignoresSafeArea()
+                LinearGradient(
+                    colors: [
+                        theme.background,
+                        theme.primaryLight.opacity(0.42),
+                        theme.background
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         photoGallery(geo: geo)
                         infoCards
-                        Spacer().frame(height: 110)
+                        // Pastdagi fixed action kartalarning ustini yopib qolmaydi.
+                        Spacer().frame(height: 94)
                     }
                 }
 
                 // Fixed bottom action area
                 actionArea
                     .padding(.horizontal, 24)
-                    .padding(.bottom, geo.safeAreaInsets.bottom + 16)
+                    .frame(maxWidth: 520)
+                    // Home indicator xavfsiz, lekin tugma oldingidan ancha pastda.
+                    .padding(.bottom, max(8, geo.safeAreaInsets.bottom - 12))
+                    .offset(y: 10)
+
+                backButton
+                    .padding(.top, geo.safeAreaInsets.top + 10)
+                    .padding(.leading, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .ignoresSafeArea(edges: .top)
-        }
-        .overlay(alignment: .topLeading) {
-            backButton
-                .padding(.top, 56)
-                .padding(.leading, 20)
         }
         .task {
             await vm.checkLikeStatus(userId: user.id)
@@ -174,6 +232,7 @@ struct UserProfileView: View {
         VStack(spacing: 14) {
             basicInfoCard
             bioCard
+            socialLinksCard
             interestsCard(items: user.profile?.interests ?? [])
             goalsCard(items: user.profile?.goals ?? [])
         }
@@ -183,9 +242,7 @@ struct UserProfileView: View {
 
     private var basicInfoCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(lang[.profBasicInfoTitle])
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(theme.textPrimary)
+            sectionHeader(icon: "sparkles", title: lang[.profBasicInfoTitle])
 
             HStack(spacing: 0) {
                 infoColumn(glyph: genderGlyph, title: lang[.profGenderLabel], value: genderText)
@@ -195,11 +252,21 @@ struct UserProfileView: View {
                 infoColumn(icon: "calendar", title: lang[.profAgeLabel], value: ageText)
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
+        .background(
+            LinearGradient(
+                colors: [theme.cardBackground, theme.primaryLight.opacity(0.13)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(theme.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
     }
 
     private func infoColumn(glyph: String? = nil, icon: String? = nil, title: String, value: String) -> some View {
@@ -228,9 +295,7 @@ struct UserProfileView: View {
 
     private var bioCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(lang[.profBioTitle])
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(theme.textPrimary)
+            sectionHeader(icon: "text.quote", title: lang[.profBioTitle])
 
             if let bio = user.profile?.bio, !bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(bio)
@@ -243,18 +308,26 @@ struct UserProfileView: View {
                     .foregroundColor(theme.textSecondary)
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
+        .background(
+            LinearGradient(
+                colors: [theme.cardBackground, theme.primaryLight.opacity(0.13)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(theme.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
     }
 
     private func interestsCard(items: [DashInterest]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(lang[.profInterestsTitle])
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(theme.textPrimary)
+            sectionHeader(icon: "heart.fill", title: lang[.profInterestsTitle])
 
             if items.isEmpty {
                 Text(lang[.profInterestsEmpty])
@@ -268,18 +341,26 @@ struct UserProfileView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
+        .background(
+            LinearGradient(
+                colors: [theme.cardBackground, theme.primaryLight.opacity(0.13)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(theme.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
     }
 
     private func goalsCard(items: [DashGoal]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(lang[.profGoalsTitle])
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(theme.textPrimary)
+            sectionHeader(icon: "scope", title: lang[.profGoalsTitle])
 
             if items.isEmpty {
                 Text(lang[.profGoalsEmpty])
@@ -293,11 +374,21 @@ struct UserProfileView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
+        .background(
+            LinearGradient(
+                colors: [theme.cardBackground, theme.primaryLight.opacity(0.13)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(theme.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
     }
 
     private func chip(icon: String?, text: String) -> some View {
@@ -310,6 +401,21 @@ struct UserProfileView: View {
         .padding(.vertical, 8)
         .background(theme.primaryLight)
         .clipShape(Capsule())
+    }
+
+    private func sectionHeader(icon: String, title: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(theme.primary)
+                .frame(width: 32, height: 32)
+                .background(theme.primaryLight)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(theme.textPrimary)
+        }
     }
 
     // MARK: - Gender / Location / Age (boshqa odamning profile'idan, o'zinikidan emas)
@@ -381,15 +487,18 @@ struct UserProfileView: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
-                    Image(systemName: "heart")
-                        .font(.system(size: 20, weight: .semibold))
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .frame(width: 34, height: 34)
+                        .background(Color.white.opacity(0.18))
+                        .clipShape(Circle())
                 }
                 Text(lang[.upLike])
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 17, weight: .bold))
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(height: 60)
             .background(
                 LinearGradient(
                     colors: [Color.red, theme.primary, Color.orange],
@@ -397,7 +506,8 @@ struct UserProfileView: View {
                 )
             )
             .clipShape(Capsule())
-            .shadow(color: theme.primary.opacity(0.4), radius: 12, x: 0, y: 4)
+            .overlay(Capsule().stroke(Color.white.opacity(0.55), lineWidth: 1))
+            .shadow(color: theme.primary.opacity(0.48), radius: 16, x: 0, y: 7)
         }
         .disabled(vm.isLoading)
     }
@@ -427,6 +537,71 @@ struct UserProfileView: View {
             )
         }
         .disabled(vm.isBlocking)
+    }
+
+    private var socialLinksCard: some View {
+        let links = userProfileSocialLinks(from: user.profile)
+        return VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(icon: "link", title: "Ijtimoiy tarmoqlar")
+
+            if links.isEmpty {
+                Text("Ijtimoiy tarmoq kiritilmagan")
+                    .font(.system(size: 13))
+                    .foregroundColor(theme.textSecondary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(links, id: \.platform) { item in
+                        Button {
+                            openURL(item.url)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .frame(width: 40, height: 40)
+                                    .foregroundColor(item.brandColor)
+                                    .background(item.brandColor.opacity(0.12))
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(item.brandColor.opacity(0.16), lineWidth: 1))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.label)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(theme.textPrimary)
+                                    Text("@\(item.value)")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(theme.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(item.brandColor)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(item.brandColor.opacity(0.055))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(item.brandColor.opacity(0.13), lineWidth: 1))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [theme.cardBackground, theme.primaryLight.opacity(0.13)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(theme.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
     }
 
     private var chatButton: some View {

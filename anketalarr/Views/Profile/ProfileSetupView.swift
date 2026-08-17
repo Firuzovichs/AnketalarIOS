@@ -20,6 +20,7 @@ struct ProfileSetupView: View {
     @StateObject private var loc = LocationManager()
 
     @AppStorage("profile_setup_done") private var profileSetupDone = false
+    @AppStorage("access_token") private var accessToken = ""
 
     // Bosqich
     @State private var step: ProfileStep = .basicInfo
@@ -146,7 +147,18 @@ struct ProfileSetupView: View {
                             .shadow(color: .black.opacity(0.06), radius: 6)
                     }
                 } else {
-                    Color.clear.frame(width: 40, height: 40)
+                    Button {
+                        TokenManager.shared.clear()
+                        accessToken = ""
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(theme.textPrimary)
+                            .frame(width: 40, height: 40)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.06), radius: 6)
+                    }
                 }
 
                 Spacer()
@@ -234,22 +246,19 @@ struct ProfileSetupView: View {
                 weightVal: $weightVal,
                 showHeightSheet: $showHeightSheet,
                 showWeightSheet: $showWeightSheet,
-                onContinue: { withAnimation(.spring()) { step = .interests } },
-                onSkip: { withAnimation(.spring()) { step = .interests } }
+                onContinue: { withAnimation(.spring()) { step = .interests } }
             )
         case .interests:
             ProfileInterestsStep(
                 vm: vm,
                 selectedInterestIds: $selectedInterestIds,
-                onContinue: { withAnimation(.spring()) { step = .goals } },
-                onSkip: { withAnimation(.spring()) { step = .goals } }
+                onContinue: { withAnimation(.spring()) { step = .goals } }
             )
         case .goals:
             ProfileGoalsStep(
                 vm: vm,
                 selectedGoalIds: $selectedGoalIds,
-                onContinue: { submitProfile() },
-                onSkip: { submitProfile() }
+                onContinue: { submitProfile() }
             )
         case .photos:
             ProfilePhotosStep(
@@ -257,14 +266,12 @@ struct ProfileSetupView: View {
                 pickerItems: $pickerItems,
                 selectedImages: $selectedImages,
                 uploadingPhotos: $uploadingPhotos,
-                onUpload: { uploadAllPhotos() },
-                onSkip: { withAnimation(.spring()) { step = .location } }
+                onUpload: { uploadAllPhotos() }
             )
         case .location:
             ProfileLocationStep(
                 loc: loc,
-                onContinue: { withAnimation(.spring()) { step = .faceScan } },
-                onSkip: { withAnimation(.spring()) { step = .faceScan } }
+                onContinue: { withAnimation(.spring()) { step = .faceScan } }
             )
         case .faceScan:
             ProfileFaceScanStep(
@@ -273,8 +280,7 @@ struct ProfileSetupView: View {
                 uploadingFace: $uploadingFace,
                 faceUploaded: $faceUploaded,
                 onUploadFace: { img in uploadFaceAndFinish(img) },
-                onFinish: { profileSetupDone = true },
-                onSkip: { profileSetupDone = true }
+                onFinish: { profileSetupDone = true }
             )
         }
     }

@@ -79,6 +79,9 @@ struct DashProfile: Decodable {
     let last_name: String?
     let patronymic: String?
     let birth_date: String?
+    let social_tiktok: String?
+    let social_instagram: String?
+    let social_telegram: String?
     let age: Int?
     let gender: String?
     let bio: String?
@@ -93,6 +96,7 @@ struct DashProfile: Decodable {
     let is_complete: Bool?
 
     init(first_name: String?, last_name: String?, patronymic: String?, birth_date: String?,
+         social_tiktok: String? = nil, social_instagram: String? = nil, social_telegram: String? = nil,
          age: Int?, gender: String?, bio: String?, height: Int?, weight: Int?,
          interests: [DashInterest]?, goals: [DashGoal]?, latitude: String?, longitude: String?,
          district: DashDistrict?, is_face_verified: Bool? = nil, is_complete: Bool? = nil) {
@@ -100,6 +104,9 @@ struct DashProfile: Decodable {
         self.last_name = last_name
         self.patronymic = patronymic
         self.birth_date = birth_date
+        self.social_tiktok = social_tiktok
+        self.social_instagram = social_instagram
+        self.social_telegram = social_telegram
         self.age = age
         self.gender = gender
         self.bio = bio

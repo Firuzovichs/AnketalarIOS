@@ -10,7 +10,6 @@ struct ProfileBodyInfoStep: View {
     @Binding var showHeightSheet: Bool
     @Binding var showWeightSheet: Bool
     var onContinue: () -> Void
-    var onSkip: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -41,7 +40,6 @@ struct ProfileBodyInfoStep: View {
 
             PrimaryButton(title: lang[.psContinue]) { onContinue() }
 
-            ProfileSkipButton(action: onSkip)
         }
     }
 

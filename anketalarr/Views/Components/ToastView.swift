@@ -7,13 +7,17 @@ struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: isError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                .font(.system(size: 20))
-                .foregroundColor(.white)
+            ZStack {
+                Circle().fill((isError ? Color.red : Color.green).opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(isError ? Color(red: 0.82, green: 0.20, blue: 0.30) : .green)
+            }
 
             Text(message)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color(red: 0.10, green: 0.10, blue: 0.18))
                 .multilineTextAlignment(.leading)
                 .lineLimit(3)
 
@@ -23,15 +27,13 @@ struct ToastView: View {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isError
-                      ? Color(red: 0.18, green: 0.05, blue: 0.05).opacity(0.92)
-                      : Color(red: 0.05, green: 0.22, blue: 0.12).opacity(0.92))
-                .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
+                .fill(isError ? Color(red: 1.0, green: 0.96, blue: 0.97) : Color(red: 0.94, green: 1.0, blue: 0.96))
+                .shadow(color: .black.opacity(0.10), radius: 14, x: 0, y: 5)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
-                    isError ? Color.red.opacity(0.4) : Color.green.opacity(0.4),
+                    isError ? Color.red.opacity(0.18) : Color.green.opacity(0.18),
                     lineWidth: 1
                 )
         )

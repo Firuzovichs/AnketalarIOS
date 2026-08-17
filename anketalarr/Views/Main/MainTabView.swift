@@ -22,13 +22,13 @@ struct MainTabView: View {
     @StateObject private var chatVM    = ChatListViewModel()
     @StateObject private var paywallGate = PaywallGate()
 
-    private let tabBarH:   CGFloat = 64    // ozroq kattaroq
-    private let bottomPad: CGFloat = 28
+    private let tabBarH: CGFloat = 64
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
+            let bottomSpacing: CGFloat = geo.safeAreaInsets.bottom > 0 ? 6 : 10
 
             ZStack(alignment: .bottom) {
 
@@ -43,7 +43,8 @@ struct MainTabView: View {
                 .animation(.easeInOut(duration: 0.22), value: selectedTab)
                 .frame(width: w, height: h)
 
-                // ── Tab bar (floating glass pill) ──────────────────────
+                // SwiftUI safe area'ni avtomatik hisoblaydi. Kichik qo'shimcha
+                // masofa menyuni Home Indicator ustida, ammo pastga yaqin tutadi.
                 HStack(spacing: 0) {
                     ForEach(tabItems.indices, id: \.self) { i in
                         tabButton(tabItems[i], index: i, width: (w - 32) / CGFloat(tabItems.count))
@@ -54,7 +55,7 @@ struct MainTabView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                 .shadow(color: .black.opacity(0.22), radius: 20, x: 0, y: 6)
                 .padding(.horizontal, 16)
-                .padding(.bottom, max(bottomPad, 16))
+                .padding(.bottom, bottomSpacing)
             }
             .frame(width: w, height: h)
         }

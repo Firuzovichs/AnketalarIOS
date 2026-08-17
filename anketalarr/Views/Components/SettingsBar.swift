@@ -26,7 +26,6 @@ struct SettingsBar: View {
 
             // ── Dropdownlar ────────────────────────────────────────────────
             if active == .language { langDropdown }
-            if active == .theme    { themeDropdown }
 
             // ── Tugmalar ───────────────────────────────────────────────────
             HStack(spacing: 0) {
@@ -63,7 +62,12 @@ struct SettingsBar: View {
     }
 
     private var themeButton: some View {
-        Button { toggle(.theme) } label: {
+        Button {
+            withAnimation(.spring(response: 0.25)) {
+                active = .none
+                theme.current = theme.current == .pink ? .blue : .pink
+            }
+        } label: {
             Image(systemName: theme.current.icon)
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(theme.primary)

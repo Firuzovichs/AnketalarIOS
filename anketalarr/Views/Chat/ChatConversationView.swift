@@ -42,7 +42,6 @@ struct ChatConversationView: View {
     // (.images/.videos) tekshirilib, mosiga qarab sendImage/sendVideo chaqiriladi.
     @State private var galleryItem: PhotosPickerItem? = nil
     @State private var isLoadingVideo = false
-    @FocusState private var inputFocused: Bool
     @StateObject private var recorder = VoiceRecorder()
     @StateObject private var videoRecorder = VideoRecorder()
     @StateObject private var locationManager = LocationManager()
@@ -168,8 +167,7 @@ struct ChatConversationView: View {
                         editingMessage: $editingMessage,
                         galleryItem: $galleryItem,
                         isLoadingVideo: isLoadingVideo,
-                        awaitingLocationSend: $awaitingLocationSend,
-                        inputFocused: $inputFocused
+                        awaitingLocationSend: $awaitingLocationSend
                     )
                 }
             }
@@ -408,7 +406,6 @@ struct ChatConversationView: View {
         vm.replyTo = nil
         editingMessage = msg
         draft = msg.content ?? ""
-        inputFocused = true
     }
 
     private func cancelEditing() {
@@ -547,6 +544,9 @@ struct ChatConversationView: View {
                             )
                             .id(msg.id)
                             .onAppear {
+                                // Klaviatura ochilishi ro'yxat balandligini o'zgartiradi.
+                                // Shu paytda har bir qator uchun @State yangilash SwiftUI'ni
+                                // qayta-qayta render qilib, inputni qotirib qo'ymasligi kerak.
                                 // Suzuvchi sana tasmasi uchun ko'rinish to'plamini yangilaydi.
                                 visibleMsgIds.insert(msg.id)
                                 // Ro'yxatdagi ENG BIRINCHI (eng eski) xabar ko'rinib
@@ -556,7 +556,9 @@ struct ChatConversationView: View {
                                     Task { await loadOlderIfNeeded(proxy: proxy) }
                                 }
                             }
-                            .onDisappear { visibleMsgIds.remove(msg.id) }
+                            .onDisappear {
+                                visibleMsgIds.remove(msg.id)
+                            }
                         }
                         // Ro'yxat tubidagi ko'rinmas langar — "pastga tushish"
                         // tugmasini ko'rsatish/yashirish shu orqali aniqlanadi.
@@ -588,6 +590,7 @@ struct ChatConversationView: View {
                     }
                 }
                 .onAppear { scrollProxy = proxy }
+                .scrollDismissesKeyboard(.interactively)
 
                 if !isAtBottom && !vm.messages.isEmpty {
                     scrollToBottomButton(proxy: proxy)
@@ -789,4 +792,3 @@ private struct VideoNoteOverlay: View {
         }
     }
 }
-

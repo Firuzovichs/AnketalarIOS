@@ -15,7 +15,7 @@ enum LKey: String {
     case agreeTerms, termsLink, regBtn
 
     // ForgotPassword
-    case resetTitle, resetSub
+    case resetTitle, resetSub, otpTimeLeft, errOtpExpired
     case newPwdTitle, newPwdSub, newPwdPH
     case save, resetDone, resetDoneSub, goLogin
 

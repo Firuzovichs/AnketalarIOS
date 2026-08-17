@@ -8,7 +8,6 @@ struct ProfileLocationStep: View {
     @ObservedObject var loc: LocationManager
 
     var onContinue: () -> Void
-    var onSkip: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
@@ -79,7 +78,6 @@ struct ProfileLocationStep: View {
                 PrimaryButton(title: lang[.psContinue]) { onContinue() }
             }
 
-            ProfileSkipButton(action: onSkip)
         }
     }
 }

@@ -8,7 +8,6 @@ struct ProfileInterestsStep: View {
 
     @Binding var selectedInterestIds: Set<Int>
     var onContinue: () -> Void
-    var onSkip: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -31,7 +30,6 @@ struct ProfileInterestsStep: View {
             }
 
             PrimaryButton(title: lang[.psContinue]) { onContinue() }
-            ProfileSkipButton(action: onSkip)
         }
     }
 }

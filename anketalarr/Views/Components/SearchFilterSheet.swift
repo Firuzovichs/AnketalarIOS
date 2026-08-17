@@ -1,5 +1,70 @@
 import SwiftUI
 
+/// iOS 26 system `.sheet`ni yon va pastdan ichkariga surib, floating card
+/// ko'rinishiga o'tkazadi. Android bilan bir xil, ekranning ikki yoni va
+/// pastiga zich yopishgan bottom sheet uchun to'liq ekranli overlay.
+struct SearchFilterBottomOverlay<Content: View>: View {
+    @Binding var isPresented: Bool
+    @ViewBuilder let content: () -> Content
+
+    @State private var dragOffset: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.38)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismiss() }
+
+                content()
+                    .padding(.bottom, geo.safeAreaInsets.bottom)
+                    .frame(width: geo.size.width)
+                    .frame(height: geo.size.height * 0.70)
+                    .background(Color(.systemBackground))
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            cornerRadii: .init(
+                                topLeading: 24,
+                                bottomLeading: 0,
+                                bottomTrailing: 0,
+                                topTrailing: 24
+                            )
+                        )
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 20, y: -4)
+                    .offset(y: max(0, dragOffset))
+                    .gesture(
+                        DragGesture(minimumDistance: 8)
+                            .onChanged { value in
+                                if value.translation.height > 0 {
+                                    dragOffset = value.translation.height
+                                }
+                            }
+                            .onEnded { value in
+                                if value.translation.height > 110 || value.predictedEndTranslation.height > 190 {
+                                    dismiss()
+                                } else {
+                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                        dragOffset = 0
+                                    }
+                                }
+                            }
+                    )
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .ignoresSafeArea()
+        .background(Color.clear)
+    }
+
+    private func dismiss() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+            isPresented = false
+        }
+    }
+}
+
 /// Umumiy qidiruv filtri — "Qidirish" (xarita) va "Like" (swipe) tablari
 /// IKKALASI HAM shu bitta komponentni ishlatadi (kod takrorlanmasligi uchun).
 /// Holat tashqaridan `SearchFilterState` orqali beriladi; bu sheet faqat UI va
@@ -143,10 +208,7 @@ struct SearchFilterSheet: View {
             .padding(.top, 12)
             .padding(.bottom, 8)
         }
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.82)
         .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: -4)
         .onAppear(perform: syncFromState)
     }
 

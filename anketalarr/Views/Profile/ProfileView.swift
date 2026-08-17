@@ -13,9 +13,55 @@ private struct ProfileStoryPresentation: Identifiable {
     let group: StoryGroup
 }
 
+private struct SocialProfileLink {
+    let platform: String
+    let label: String
+    let icon: String
+    let brandColor: Color
+    let url: URL
+    let value: String
+}
+
+private func socialProfileLinks(from profile: DashProfile?) -> [SocialProfileLink] {
+    guard let profile else { return [] }
+
+    func clean(_ raw: String?) -> String? {
+        let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? nil : value
+    }
+    func normalized(platform: String, usernameOrUrl: String) -> String {
+        let lower = usernameOrUrl.lowercased()
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") { return usernameOrUrl }
+        let withoutSpaces = usernameOrUrl.replacingOccurrences(of: " ", with: "")
+        let handle = withoutSpaces.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        switch platform {
+        case "tiktok": return "https://www.tiktok.com/@\(handle)"
+        case "instagram": return "https://www.instagram.com/\(handle)"
+        case "telegram": return "https://t.me/\(handle)"
+        default: return withoutSpaces
+        }
+    }
+
+    let items: [(String, String, String, Color, String?)] = [
+        ("tiktok", "TikTok", "music.note", Color(red: 0.07, green: 0.07, blue: 0.08), clean(profile.social_tiktok)),
+        ("instagram", "Instagram", "camera.fill", Color(red: 0.89, green: 0.16, blue: 0.36), clean(profile.social_instagram)),
+        ("telegram", "Telegram", "paperplane.fill", Color(red: 0.13, green: 0.62, blue: 0.85), clean(profile.social_telegram)),
+    ]
+
+    return items.compactMap { item in
+        guard
+            let raw = item.4,
+            let url = URL(string: normalized(platform: item.0, usernameOrUrl: raw))
+        else { return nil }
+        let handle = String((raw.split(separator: "/").last.map(String.init) ?? raw).drop(while: { $0 == "@" }))
+        return SocialProfileLink(platform: item.0, label: item.1, icon: item.2, brandColor: item.3, url: url, value: handle)
+    }
+}
+
 struct ProfileView: View {
     @EnvironmentObject var theme: AppTheme
     @EnvironmentObject var lang:  LocalizationManager
+    @Environment(\.openURL) private var openURL
     // Faqat pastdagi SettingsSheetView'ga (Obuna qatori) qayta in'ektsiya
     // qilish uchun kerak — bu ekranning o'zi paywall ko'rsatmaydi.
     @EnvironmentObject var paywallGate: PaywallGate
@@ -57,6 +103,7 @@ struct ProfileView: View {
                         )
 
                         ProfileBioCard(bio: vm.me?.profile?.bio, onAddBio: { showEdit = true })
+                        socialLinksCard
 
                         interestsCard
                         goalsCard
@@ -277,6 +324,64 @@ struct ProfileView: View {
             .clipShape(Capsule())
             .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         }
+    }
+
+    private var socialLinksCard: some View {
+        let links = socialProfileLinks(from: vm.me?.profile)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Ijtimoiy tarmoqlar")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(theme.textPrimary)
+
+            if links.isEmpty {
+                Text("Ijtimoiy tarmoq kiritilmagan")
+                    .font(.system(size: 13))
+                    .foregroundColor(theme.textSecondary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(links, id: \.platform) { item in
+                        Button {
+                            openURL(item.url)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .frame(width: 40, height: 40)
+                                    .foregroundColor(item.brandColor)
+                                    .background(item.brandColor.opacity(0.12))
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(item.brandColor.opacity(0.16), lineWidth: 1))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.label)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(theme.textPrimary)
+                                    Text("@\(item.value)")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(theme.textSecondary)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(item.brandColor)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(item.brandColor.opacity(0.055))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(item.brandColor.opacity(0.13), lineWidth: 1))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
     }
 
     // MARK: - Gender / Location / Age (ProfileBasicInfoCard uchun)

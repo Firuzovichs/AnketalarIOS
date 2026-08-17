@@ -23,21 +23,6 @@ struct ProfileStepHeader: View {
     }
 }
 
-// MARK: - "O'tkazib yuborish" tugmasi (bir nechta bosqichda ishlatiladi)
-struct ProfileSkipButton: View {
-    @EnvironmentObject var theme: AppTheme
-    @EnvironmentObject var lang: LocalizationManager
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(lang[.psSkip])
-                .font(.system(size: 14))
-                .foregroundColor(theme.textSecondary)
-        }
-    }
-}
-
 // MARK: - Qiziqish/Maqsad chiplari grid (Interests va Goals bosqichlarida ishlatiladi)
 struct ChipGrid: View {
     @EnvironmentObject var theme: AppTheme

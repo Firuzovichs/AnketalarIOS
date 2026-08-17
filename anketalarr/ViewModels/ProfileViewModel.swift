@@ -153,7 +153,10 @@ class ProfileViewModel: ObservableObject {
         birthDate: String, gender: String, bio: String,
         height: Int?, weight: Int?,
         interestIds: [Int], goalIds: [Int],
-        districtId: Int? = nil
+        districtId: Int? = nil,
+        socialTiktok: String? = nil,
+        socialInstagram: String? = nil,
+        socialTelegram: String? = nil
     ) async -> Bool {
         isSavingProfile = true
         defer { isSavingProfile = false }
@@ -177,6 +180,9 @@ class ProfileViewModel: ObservableObject {
         if let h = height { bodyDict["height"] = h }
         if let w = weight { bodyDict["weight"] = w }
         if let d = districtId { bodyDict["district_id"] = d }
+        bodyDict["social_tiktok"] = socialTiktok?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        bodyDict["social_instagram"] = socialInstagram?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        bodyDict["social_telegram"] = socialTelegram?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
         req.httpBody = try? JSONSerialization.data(withJSONObject: bodyDict)
 

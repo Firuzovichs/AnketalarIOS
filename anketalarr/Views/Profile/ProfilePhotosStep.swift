@@ -11,7 +11,6 @@ struct ProfilePhotosStep: View {
     @Binding var selectedImages: [UIImage]
     @Binding var uploadingPhotos: Bool
     var onUpload: () -> Void
-    var onSkip: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -70,7 +69,6 @@ struct ProfilePhotosStep: View {
                 onUpload()
             }
 
-            ProfileSkipButton(action: onSkip)
         }
     }
 }

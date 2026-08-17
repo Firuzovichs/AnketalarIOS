@@ -51,15 +51,6 @@ struct MapTabView: View {
                 .padding(.bottom, 164)
                 .zIndex(2)
 
-            if showFilter {
-                DetailOverlay(isPresented: $showFilter) {
-                    SearchFilterSheet(filters: vm.filters, showRadius: true, viewerIsVip: vm.viewerIsVip, onApply: {
-                        vm.applyFilters()
-                        withAnimation(.spring()) { showFilter = false }
-                    })
-                }
-                .zIndex(3)
-            }
         }
         .overlay(alignment: .top) { topBanner }
         .fullScreenCover(item: $selectedProfileUser) { user in
@@ -86,6 +77,20 @@ struct MapTabView: View {
             let coord = location.coordinate
             centerOverride = coord
             Task { await vm.fetchNearby(lat: coord.latitude, lng: coord.longitude) }
+        }
+        .fullScreenCover(isPresented: $showFilter) {
+            SearchFilterBottomOverlay(isPresented: $showFilter) {
+                SearchFilterSheet(
+                    filters: vm.filters,
+                    showRadius: true,
+                    viewerIsVip: vm.viewerIsVip,
+                    onApply: {
+                        vm.applyFilters()
+                        showFilter = false
+                    }
+                )
+            }
+            .presentationBackground(.clear)
         }
     }
 

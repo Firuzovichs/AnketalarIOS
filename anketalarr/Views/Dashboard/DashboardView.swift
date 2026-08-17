@@ -50,18 +50,6 @@ struct DashboardView: View {
                 // notifications fullScreenCover — ZStack dan tashqarida
 
                 // ── Detail sheets ──────────────────────────────────────
-                if let banner = vm.selectedBanner {
-                    DetailOverlay(isPresented: Binding(
-                        get: { vm.selectedBanner != nil },
-                        set: { if !$0 { vm.selectedBanner = nil } }
-                    )) { BannerDetailCard(banner: banner) }
-                }
-                if let news = vm.selectedNews {
-                    DetailOverlay(isPresented: Binding(
-                        get: { vm.selectedNews != nil },
-                        set: { if !$0 { vm.selectedNews = nil } }
-                    )) { NewsDetailCard(news: news) }
-                }
             }
             .frame(width: w)
         }
@@ -76,6 +64,22 @@ struct DashboardView: View {
             UserProfileView(user: user, onDismiss: { selectedProfileUser = nil })
                 .environmentObject(theme)
                 .environmentObject(lang)
+        }
+        .fullScreenCover(item: $vm.selectedBanner) { banner in
+            BannerBottomSheetOverlay(
+                banner: banner,
+                onDismiss: { vm.selectedBanner = nil }
+            )
+            .environmentObject(theme)
+            .presentationBackground(.clear)
+        }
+        .fullScreenCover(item: $vm.selectedNews) { news in
+            NewsBottomSheetOverlay(
+                news: news,
+                onDismiss: { vm.selectedNews = nil }
+            )
+            .environmentObject(theme)
+            .presentationBackground(.clear)
         }
         .sheet(isPresented: $showSettings) {
             SettingsSheetView()

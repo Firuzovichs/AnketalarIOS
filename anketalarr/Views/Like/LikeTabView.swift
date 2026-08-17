@@ -44,16 +44,6 @@ struct LikeTabView: View {
             // "Qidirish" (xarita) tabidagi bilan BIR XIL filtr sheet — kod
             // takrorlanmasligi uchun bitta `SearchFilterSheet` ikkala joyda
             // ham import qilinadi. Radius bu yerda yashirin (showRadius: false).
-            if showFilter {
-                DetailOverlay(isPresented: $showFilter) {
-                    SearchFilterSheet(filters: vm.filters, showRadius: false, onApply: {
-                        vm.applyFilters()
-                        withAnimation(.spring()) { showFilter = false }
-                    })
-                }
-                .zIndex(3)
-            }
-
             if showMessageComposer {
                 DetailOverlay(isPresented: $showMessageComposer) {
                     likeMessageComposer
@@ -71,6 +61,15 @@ struct LikeTabView: View {
                 .environmentObject(lang)
         }
         .animation(.easeInOut(duration: 0.2), value: vm.matchedUser != nil)
+        .fullScreenCover(isPresented: $showFilter) {
+            SearchFilterBottomOverlay(isPresented: $showFilter) {
+                SearchFilterSheet(filters: vm.filters, showRadius: false, onApply: {
+                    vm.applyFilters()
+                    showFilter = false
+                })
+            }
+            .presentationBackground(.clear)
+        }
     }
 
     // MARK: - Header

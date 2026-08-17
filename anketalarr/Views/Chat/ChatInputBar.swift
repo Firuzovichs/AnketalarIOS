@@ -38,8 +38,6 @@ struct ChatInputBar: View {
     @Binding var galleryItem: PhotosPickerItem?
     var isLoadingVideo: Bool
     @Binding var awaitingLocationSend: Bool
-    var inputFocused: FocusState<Bool>.Binding
-
     @State private var recordMode: RecordMode = .voice
     @State private var pressTask: Task<Void, Never>? = nil
     @State private var didBeginRecording = false
@@ -133,14 +131,17 @@ struct ChatInputBar: View {
     }
 
     private var textField: some View {
-        TextField(lang[.chatInputPlaceholder], text: $draft, axis: .vertical)
+        // `axis: .vertical` + dinamik lineLimit klaviatura ochilganda parentdagi
+        // LazyVStack bilan layout sikliga tushishi mumkin. Barqaror bir qatorli
+        // input yozish paytida main thread qotib qolishining oldini oladi.
+        TextField(lang[.chatInputPlaceholder], text: $draft)
             .font(.system(size: 15))
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .frame(height: 40)
             .background(Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 18))
-            .focused(inputFocused)
-            .lineLimit(1...4)
+            .textInputAutocapitalization(.sentences)
+            .autocorrectionDisabled(false)
             .onChange(of: draft) { _, _ in vm.userIsTyping() }
     }
 

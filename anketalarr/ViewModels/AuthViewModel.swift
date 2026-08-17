@@ -63,10 +63,29 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Ro'yxatdan o'tish
-    func register(identifier: String, otp: String, password: String) {
+    func verifyOTP(identifier: String, otp: String, completion: @escaping () -> Void) {
         errorMessage = nil; isLoading = true
-        post(path: "/register/", body: ["identifier": identifier, "otp": otp, "password": password],
+        post(path: "/verify-otp/", body: ["identifier": identifier, "otp": otp], auth: false) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                switch result {
+                case .success: completion()
+                case .failure(let error): self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    // MARK: - Ro'yxatdan o'tish
+    func register(identifier: String, otp: String, password: String, termsVersion: String) {
+        errorMessage = nil; isLoading = true
+        post(path: "/register/", body: [
+            "identifier": identifier,
+            "otp": otp,
+            "password": password,
+            "terms_accepted": true,
+            "terms_version": termsVersion,
+        ],
              auth: false) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoading = false

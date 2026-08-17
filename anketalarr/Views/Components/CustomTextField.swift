@@ -101,31 +101,47 @@ struct CheckboxRow: View {
     @Binding var isChecked: Bool
     let label: String
     var linkText: String? = nil
+    var isInteractive: Bool = true
+    var onBlockedTap: (() -> Void)? = nil
     var linkAction: (() -> Void)? = nil
     @EnvironmentObject var theme: AppTheme
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Button {
-                withAnimation(.spring(response: 0.2)) { isChecked.toggle() }
+                if isInteractive {
+                    withAnimation(.spring(response: 0.2)) { isChecked.toggle() }
+                } else {
+                    onBlockedTap?()
+                }
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(isChecked ? theme.primary : Color.gray.opacity(0.4), lineWidth: 1.5)
+                        .fill(isChecked ? theme.primary.opacity(0.10) : Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(isChecked ? theme.primary : Color.gray.opacity(0.4), lineWidth: 1.4)
+                        )
                         .frame(width: 22, height: 22)
 
                     if isChecked {
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(theme.primary)
+                    } else if !isInteractive {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(theme.textSecondary.opacity(0.5))
                     }
                 }
             }
+            .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 14))
-                    .foregroundColor(.primary.opacity(0.8))
+                    .foregroundColor(theme.textPrimary.opacity(0.85))
+                    .multilineTextAlignment(.leading)
 
                 if let link = linkText {
                     Button(action: { linkAction?() }) {
@@ -133,6 +149,7 @@ struct CheckboxRow: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(theme.primary)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -144,20 +161,13 @@ struct OTPFieldView: View {
     @Binding var otp: String
     let length: Int = 6
     @EnvironmentObject var theme: AppTheme
-    @FocusState private var isFocused: Bool
+    @State private var selectedIndex = 0
 
     var body: some View {
         ZStack {
-            TextField("", text: $otp)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .focused($isFocused)
-                .opacity(0)
-                .frame(width: 1)
-                .onChange(of: otp) { _, new in
-                    if new.count > length { otp = String(new.prefix(length)) }
-                    otp = new.filter { $0.isNumber }
-                }
+            OTPTextFieldBridge(otp: $otp, selectedIndex: $selectedIndex, length: length)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
 
             HStack(spacing: 10) {
                 ForEach(0..<length, id: \.self) { i in
@@ -170,18 +180,72 @@ struct OTPFieldView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(
-                                        i == otp.count ? theme.primary : Color.gray.opacity(0.2),
-                                        lineWidth: i == otp.count ? 2 : 1
+                                        i == selectedIndex ? theme.primary : Color.gray.opacity(0.2),
+                                        lineWidth: i == selectedIndex ? 2 : 1
                                     )
                             )
                         Text(char)
                             .font(.system(size: 22, weight: .semibold))
                             .foregroundColor(theme.textPrimary)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedIndex = min(i, otp.count)
+                    }
                 }
             }
-            .onTapGesture { isFocused = true }
         }
-        .onAppear { isFocused = true }
+    }
+}
+
+private struct OTPTextFieldBridge: UIViewRepresentable {
+    @Binding var otp: String
+    @Binding var selectedIndex: Int
+    let length: Int
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.keyboardType = .numberPad
+        field.textContentType = .oneTimeCode
+        field.textColor = .clear
+        field.tintColor = .clear
+        field.delegate = context.coordinator
+        DispatchQueue.main.async { field.becomeFirstResponder() }
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.parent = self
+        if field.text != otp { field.text = otp }
+        context.coordinator.applySelection(to: field)
+        if !field.isFirstResponder { DispatchQueue.main.async { field.becomeFirstResponder() } }
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: OTPTextFieldBridge
+        init(_ parent: OTPTextFieldBridge) { self.parent = parent }
+
+        func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+            let current = field.text ?? ""
+            guard let swiftRange = Range(range, in: current) else { return false }
+            let candidate = current.replacingCharacters(in: swiftRange, with: string)
+            let normalized = String(candidate.filter(\.isNumber).prefix(parent.length))
+            field.text = normalized
+            parent.otp = normalized
+            parent.selectedIndex = min(range.location + string.filter(\.isNumber).count, normalized.count)
+            applySelection(to: field)
+            return false
+        }
+
+        func applySelection(to field: UITextField) {
+            let count = (field.text ?? "").count
+            let startOffset = min(parent.selectedIndex, count)
+            guard let start = field.position(from: field.beginningOfDocument, offset: startOffset) else { return }
+            let endOffset = startOffset < count ? startOffset + 1 : startOffset
+            guard let end = field.position(from: field.beginningOfDocument, offset: endOffset) else { return }
+            field.selectedTextRange = field.textRange(from: start, to: end)
+        }
     }
 }

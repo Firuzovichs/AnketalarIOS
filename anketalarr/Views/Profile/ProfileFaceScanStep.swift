@@ -11,7 +11,6 @@ struct ProfileFaceScanStep: View {
     @Binding var faceUploaded: Bool
     var onUploadFace: (UIImage) -> Void
     var onFinish: () -> Void
-    var onSkip: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
@@ -110,7 +109,6 @@ struct ProfileFaceScanStep: View {
                 }
             }
 
-            ProfileSkipButton(action: onSkip)
         }
     }
 }

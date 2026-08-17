@@ -9,8 +9,12 @@ struct LoginView: View {
     @State private var password   = ""
     @State private var showRegister = false
     @State private var showForgot   = false
+    @State private var passwordVisible = false
     @State private var formOpacity: Double  = 0
     @State private var formOffset:  CGFloat = 40
+    @FocusState private var focusedField: LoginField?
+
+    private enum LoginField { case identifier, password }
 
     var body: some View {
         NavigationStack {
@@ -35,17 +39,8 @@ struct LoginView: View {
                         .padding(.bottom, 36)
 
                         VStack(spacing: 14) {
-                            CustomTextField(
-                                icon: "envelope",
-                                placeholder: lang[.emailPH],
-                                text: $identifier,
-                                keyboardType: .emailAddress
-                            )
-                            CustomSecureField(
-                                icon: "lock",
-                                placeholder: lang[.passwordPH],
-                                text: $password
-                            )
+                            identifierField
+                            passwordField
 
                             HStack {
                                 Spacer()
@@ -57,7 +52,7 @@ struct LoginView: View {
                             }
 
                             PrimaryButton(title: lang[.loginBtn], isLoading: vm.isLoading) {
-                                vm.login(identifier: identifier, password: password)
+                                vm.login(identifier: normalizedIdentifier, password: password)
                             }
                             .padding(.top, 4)
                         }
@@ -94,6 +89,105 @@ struct LoginView: View {
                 }
             }
         }
+    }
+
+    private var identifierField: some View {
+        HStack(spacing: 14) {
+            Image(systemName: isPhoneIdentifier ? "phone" : "envelope")
+                .foregroundColor(.gray.opacity(0.6))
+                .frame(width: 22)
+
+            TextField(lang[.emailPH], text: Binding(
+                get: { identifier },
+                set: { newValue in
+                    let wasComplete = isPhoneComplete
+                    identifier = Self.formatIdentifier(newValue)
+                    if isPhoneComplete && !wasComplete {
+                        DispatchQueue.main.async { focusedField = .password }
+                    }
+                }
+            ))
+            .keyboardType(isPhoneIdentifier ? .phonePad : .emailAddress)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .textContentType(isPhoneIdentifier ? .telephoneNumber : .username)
+            .submitLabel(.next)
+            .focused($focusedField, equals: .identifier)
+            .onSubmit { focusedField = .password }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+    }
+
+    private var passwordField: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "lock")
+                .foregroundColor(.gray.opacity(0.6))
+                .frame(width: 22)
+
+            Group {
+                if passwordVisible {
+                    TextField(lang[.passwordPH], text: $password)
+                } else {
+                    SecureField(lang[.passwordPH], text: $password)
+                }
+            }
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .textContentType(.password)
+            .submitLabel(.done)
+            .focused($focusedField, equals: .password)
+            .onSubmit {
+                focusedField = nil
+                vm.login(identifier: normalizedIdentifier, password: password)
+            }
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { passwordVisible.toggle() }
+            } label: {
+                Image(systemName: passwordVisible ? "eye.slash" : "eye")
+                    .foregroundColor(.gray.opacity(0.5))
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+    }
+
+    private var isPhoneIdentifier: Bool {
+        identifier.hasPrefix("+998")
+    }
+
+    private var isPhoneComplete: Bool {
+        isPhoneIdentifier && identifier.filter(\.isNumber).count == 12
+    }
+
+    private var normalizedIdentifier: String {
+        isPhoneIdentifier ? identifier.replacingOccurrences(of: " ", with: "") : identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func formatIdentifier(_ input: String) -> String {
+        guard input.hasPrefix("+") else { return input }
+        let digits = String(input.filter(\.isNumber).prefix(12))
+        guard !digits.isEmpty else { return "+" }
+        guard "998".hasPrefix(digits) || digits.hasPrefix("998") else { return input }
+        guard digits.count > 3 else { return "+\(digits)" }
+
+        let local = String(digits.dropFirst(3))
+        let groupSizes = [2, 3, 2, 2]
+        var result = "+998"
+        var index = local.startIndex
+        for size in groupSizes where index < local.endIndex {
+            let end = local.index(index, offsetBy: size, limitedBy: local.endIndex) ?? local.endIndex
+            result += " " + String(local[index..<end])
+            index = end
+        }
+        return result
     }
 }
 

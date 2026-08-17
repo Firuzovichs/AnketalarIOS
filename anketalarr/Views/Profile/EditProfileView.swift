@@ -25,6 +25,10 @@ struct EditProfileView: View {
     @State private var heightVal: Int = 170
     @State private var weightVal: Int = 65
 
+    @State private var socialTiktok = ""
+    @State private var socialInstagram = ""
+    @State private var socialTelegram = ""
+
     @State private var selectedInterestIds: Set<Int> = []
     @State private var selectedGoalIds:     Set<Int> = []
 
@@ -56,6 +60,7 @@ struct EditProfileView: View {
                         bioField
                         interestsField
                         goalsField
+                        socialFields
 
                         PrimaryButton(title: lang[.save], isLoading: saveVM.isSavingProfile) {
                             Task { await save() }
@@ -409,6 +414,72 @@ struct EditProfileView: View {
         }
     }
 
+    private var socialFields: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Ijtimoiy tarmoqlar")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(theme.textPrimary)
+
+            Text("Faqat nickname yozing — havola kiritish shart emas")
+                .font(.system(size: 12))
+                .foregroundColor(theme.textSecondary)
+
+            socialNicknameField("TikTok", icon: "music.note", color: .black,
+                                text: $socialTiktok, maxLength: 24, allowDot: true)
+            socialNicknameField("Instagram", icon: "camera.fill", color: Color(red: 0.89, green: 0.16, blue: 0.36),
+                                text: $socialInstagram, maxLength: 30, allowDot: true)
+            socialNicknameField("Telegram", icon: "paperplane.fill", color: Color(red: 0.13, green: 0.62, blue: 0.85),
+                                text: $socialTelegram, maxLength: 32, allowDot: false)
+        }
+    }
+
+    private func socialNicknameField(
+        _ network: String,
+        icon: String,
+        color: Color,
+        text: Binding<String>,
+        maxLength: Int,
+        allowDot: Bool
+    ) -> some View {
+        let filtered = Binding<String>(
+            get: { text.wrappedValue },
+            set: { raw in
+                guard !raw.contains("://"), !raw.contains("/") else { return }
+                let allowed = allowDot
+                    ? CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._")
+                    : CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+                text.wrappedValue = String(raw.drop(while: { $0 == "@" }).unicodeScalars
+                    .filter { allowed.contains($0) }.prefix(maxLength))
+            }
+        )
+
+        return HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(color)
+                .frame(width: 38, height: 38)
+                .background(Circle().fill(color.opacity(0.10)))
+
+            Text("@")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundColor(color)
+
+            TextField("\(network) nickname", text: filtered)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(theme.textPrimary)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 66)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white)
+                .shadow(color: color.opacity(0.14), radius: 8, x: 0, y: 3)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(color.opacity(0.24), lineWidth: 1))
+    }
+
     private var goalsField: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(lang[.psSelectGoals])
@@ -462,6 +533,9 @@ struct EditProfileView: View {
         bio        = profile.bio ?? ""
         if let h = profile.height { heightVal = h }
         if let w = profile.weight { weightVal = w }
+        socialTiktok = socialNickname(profile.social_tiktok, network: "tiktok")
+        socialInstagram = socialNickname(profile.social_instagram, network: "instagram")
+        socialTelegram = socialNickname(profile.social_telegram, network: "telegram")
         if let bd = profile.birth_date, let parsed = parseDate(bd) {
             birthDate = parsed
         }
@@ -485,7 +559,10 @@ struct EditProfileView: View {
             birthDate: formatDate(birthDate), gender: gender, bio: bio,
             height: heightVal, weight: weightVal,
             interestIds: Array(selectedInterestIds), goalIds: Array(selectedGoalIds),
-            districtId: selectedDistrictId
+            districtId: selectedDistrictId,
+            socialTiktok: socialTiktok,
+            socialInstagram: socialInstagram,
+            socialTelegram: socialTelegram
         )
         if ok {
             onSaved()
@@ -499,6 +576,22 @@ struct EditProfileView: View {
 
     private func formatDate(_ date: Date) -> String {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: date)
+    }
+
+    private func socialNickname(_ raw: String?, network: String) -> String {
+        var value = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        value = value.components(separatedBy: "?").first ?? value
+        value = value.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if network == "tiktok", let range = value.range(of: "/@", options: .backwards) {
+            value = String(value[range.upperBound...])
+        } else if let last = value.split(separator: "/").last {
+            value = String(last)
+        }
+        value = String(value.drop(while: { $0 == "@" }))
+        let allowed = network == "telegram"
+            ? CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+            : CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._")
+        return String(value.unicodeScalars.filter { allowed.contains($0) })
     }
 
     private func formatDateDisplay(_ date: Date) -> String {

@@ -8,7 +8,6 @@ struct ProfileGoalsStep: View {
 
     @Binding var selectedGoalIds: Set<Int>
     var onContinue: () -> Void
-    var onSkip: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -28,7 +27,6 @@ struct ProfileGoalsStep: View {
             }
 
             PrimaryButton(title: lang[.psContinue], isLoading: vm.isLoading) { onContinue() }
-            ProfileSkipButton(action: onSkip)
         }
     }
 }
