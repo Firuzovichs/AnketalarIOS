@@ -698,7 +698,7 @@ struct ProfileView: View {
                     .shadow(color: theme.primary.opacity(0.35), radius: 12, y: 6)
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 12)
+            .padding(.bottom, 100)
             .background(theme.background)
         }
     }
