@@ -21,6 +21,8 @@ class ProfileViewModel: ObservableObject {
     @Published var countries: [LocCountry] = []
     @Published var regions: [LocRegion] = []
     @Published var districts: [LocDistrict] = []
+    @Published var interests: [DashInterest] = []
+    @Published var goals: [DashGoal] = []
 
     // MARK: - Load
 
@@ -88,6 +90,22 @@ class ProfileViewModel: ObservableObject {
     func fetchDistricts(regionId: Int) async {
         guard let data = await APIClient.shared.getData("\(APIConfig.base)/locations/districts/?region=\(regionId)") else { return }
         if let list = decodeList(LocDistrict.self, from: data) { districts = list }
+    }
+
+    func fetchInterests() async {
+        guard let data = await APIClient.shared.getData("\(APIConfig.authBase)/interests/") else { return }
+        struct Page: Decodable { let results: [DashInterest] }
+        if let page = try? JSONDecoder().decode(Page.self, from: data), !page.results.isEmpty {
+            interests = page.results
+        }
+    }
+
+    func fetchGoals() async {
+        guard let data = await APIClient.shared.getData("\(APIConfig.authBase)/goals/") else { return }
+        struct Page: Decodable { let results: [DashGoal] }
+        if let page = try? JSONDecoder().decode(Page.self, from: data), !page.results.isEmpty {
+            goals = page.results
+        }
     }
 
     func uploadPhoto(imageData: Data) async -> Bool {

@@ -10,8 +10,7 @@ struct EditProfileView: View {
     @EnvironmentObject var lang:  LocalizationManager
     @Environment(\.dismiss) private var dismiss
 
-    @StateObject private var lookupVM = AuthViewModel()
-    @StateObject private var saveVM   = ProfileViewModel()
+    @StateObject private var saveVM = ProfileViewModel()
 
     let me: DashMe?
     var onSaved: () -> Void
@@ -74,8 +73,8 @@ struct EditProfileView: View {
         }
         .onAppear {
             prefill()
-            lookupVM.fetchInterests()
-            lookupVM.fetchGoals()
+            Task { await saveVM.fetchInterests() }
+            Task { await saveVM.fetchGoals() }
             Task {
                 await saveVM.fetchCountries()
                 // Yagona davlat bo'lsa — foydalanuvchi tanlamasa ham avtomatik belgilanadi
@@ -403,11 +402,11 @@ struct EditProfileView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(theme.textPrimary)
 
-            if lookupVM.interests.isEmpty {
+            if saveVM.interests.isEmpty {
                 ProgressView().tint(theme.primary)
             } else {
                 chipGrid(
-                    items: lookupVM.interests.map { ($0.id, $0.displayName(lang: lang.language.rawValue), $0.icon) },
+                    items: saveVM.interests.map { ($0.id, $0.localName(lang: lang), $0.icon ?? "") },
                     selected: $selectedInterestIds
                 )
             }
@@ -486,11 +485,11 @@ struct EditProfileView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(theme.textPrimary)
 
-            if lookupVM.goals.isEmpty {
+            if saveVM.goals.isEmpty {
                 ProgressView().tint(theme.primary)
             } else {
                 chipGrid(
-                    items: lookupVM.goals.map { ($0.id, $0.displayName(lang: lang.language.rawValue), $0.icon) },
+                    items: saveVM.goals.map { ($0.id, $0.localName(lang: lang), $0.icon ?? "") },
                     selected: $selectedGoalIds
                 )
             }

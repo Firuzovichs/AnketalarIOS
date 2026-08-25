@@ -41,6 +41,9 @@ enum LKey: String {
     case psLocTitle, psLocSub, psDetectLoc, psLocDetected
     case psFaceTitle, psFaceSub, psTakePhoto, psRetake
 
+    // Tab bar
+    case tabHome, tabMap, tabLike, tabChat, tabProfile
+
     // Dashboard
     case dbHello, dbUser, dbMyStory
     case dbForYou, dbNearby, dbNew

@@ -170,6 +170,12 @@ let ruT: [LKey: String] = [
     .vipReqSub:   "Чтобы видеть фото пользователей полностью, нужна подписка Premium.",
     .vipReqBtn:   "Купить Premium",
 
+    .tabHome:    "Главная",
+    .tabMap:     "Карта",
+    .tabLike:    "Лайк",
+    .tabChat:    "Чат",
+    .tabProfile: "Профиль",
+
     .mapTitle:         "Карта",
     .mapFilterTitle:   "Фильтр",
     .mapAge:           "Возраст",

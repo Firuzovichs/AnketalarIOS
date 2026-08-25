@@ -170,6 +170,12 @@ let uzT: [LKey: String] = [
     .vipReqSub:   "Foydalanuvchilarning rasmlarini to'liq ko'rish uchun Premium obunaga ega bo'lishingiz kerak.",
     .vipReqBtn:   "Premium sotib olish",
 
+    .tabHome:    "Bosh",
+    .tabMap:     "Xarita",
+    .tabLike:    "Like",
+    .tabChat:    "Chat",
+    .tabProfile: "Profil",
+
     .mapTitle:         "Xarita",
     .mapFilterTitle:   "Filtr",
     .mapAge:           "Yosh",

@@ -170,6 +170,12 @@ let enT: [LKey: String] = [
     .vipReqSub:   "You need a Premium subscription to see users' photos in full.",
     .vipReqBtn:   "Get Premium",
 
+    .tabHome:    "Home",
+    .tabMap:     "Map",
+    .tabLike:    "Like",
+    .tabChat:    "Chat",
+    .tabProfile: "Profile",
+
     .mapTitle:         "Map",
     .mapFilterTitle:   "Filter",
     .mapAge:           "Age",

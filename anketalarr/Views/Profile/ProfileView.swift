@@ -484,12 +484,12 @@ struct ProfileView: View {
     private func displayChip(icon: String?, text: String) -> some View {
         HStack(spacing: 6) {
             if let icon, !icon.isEmpty { Text(icon).font(.system(size: 14)) }
-            Text(text).font(.system(size: 13, weight: .medium))
+            Text(text).font(.system(size: 13, weight: .semibold))
         }
-        .foregroundColor(theme.primary)
+        .foregroundColor(.white)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(theme.primaryLight)
+        .background(theme.primary)
         .clipShape(Capsule())
     }
 

@@ -6,12 +6,12 @@ private struct TabItem {
     let label: String
 }
 
-private let tabItems: [TabItem] = [
-    .init(icon: "house",           activeIcon: "house.fill",              label: "Bosh"),
-    .init(icon: "magnifyingglass", activeIcon: "sparkle.magnifyingglass", label: "Qidirish"),
-    .init(icon: "heart",           activeIcon: "heart.fill",              label: "Like"),
-    .init(icon: "message",         activeIcon: "message.fill",            label: "Chat"),
-    .init(icon: "person.circle",   activeIcon: "person.circle.fill",      label: "Profil"),
+private let tabIcons: [(icon: String, activeIcon: String, key: LKey)] = [
+    ("house",           "house.fill",              .tabHome),
+    ("magnifyingglass", "sparkle.magnifyingglass", .tabMap),
+    ("heart",           "heart.fill",              .tabLike),
+    ("message",         "message.fill",            .tabChat),
+    ("person.circle",   "person.circle.fill",      .tabProfile),
 ]
 
 struct MainTabView: View {
@@ -46,8 +46,9 @@ struct MainTabView: View {
                 // SwiftUI safe area'ni avtomatik hisoblaydi. Kichik qo'shimcha
                 // masofa menyuni Home Indicator ustida, ammo pastga yaqin tutadi.
                 HStack(spacing: 0) {
-                    ForEach(tabItems.indices, id: \.self) { i in
-                        tabButton(tabItems[i], index: i, width: (w - 32) / CGFloat(tabItems.count))
+                    ForEach(tabIcons.indices, id: \.self) { i in
+                        let t = tabIcons[i]
+                        tabButton(icon: t.icon, activeIcon: t.activeIcon, label: lang[t.key], index: i, width: (w - 32) / CGFloat(tabIcons.count))
                     }
                 }
                 .frame(height: tabBarH)
@@ -84,7 +85,7 @@ struct MainTabView: View {
 
     // MARK: - Tab button
 
-    private func tabButton(_ item: TabItem, index: Int, width: CGFloat) -> some View {
+    private func tabButton(icon: String, activeIcon: String, label: String, index: Int, width: CGFloat) -> some View {
         let active = selectedTab == index
         let badge  = index == 3 ? chatVM.totalUnread : 0
         let color  = active ? theme.primary : Color(.secondaryLabel)
@@ -95,17 +96,15 @@ struct MainTabView: View {
             }
         } label: {
             ZStack {
-                // ── Doira fon — faol tab uchun ──
                 if active {
                     Capsule()
                         .fill(Color(.label).opacity(0.1))
                         .frame(width: 74, height: 52)
                 }
 
-                // ── Icon + label ─────────────────────
                 VStack(spacing: 3) {
                     ZStack(alignment: .topTrailing) {
-                        Image(systemName: active ? item.activeIcon : item.icon)
+                        Image(systemName: active ? activeIcon : icon)
                             .font(.system(size: 24, weight: active ? .semibold : .regular))
                             .foregroundColor(color)
                             .scaleEffect(active ? 1.08 : 1.0)
@@ -124,7 +123,7 @@ struct MainTabView: View {
                         }
                     }
 
-                    Text(item.label)
+                    Text(label)
                         .font(.system(size: 11, weight: active ? .semibold : .regular))
                         .foregroundColor(color)
                 }
